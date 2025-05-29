@@ -59,7 +59,7 @@ def transform_all() -> pd.DataFrame:
     emis["country_norm"] = "Global"
     
     pop_2023 = pop.query("year == 2023").copy()
-    cons["consumption_kg" = cons["consumption_1000t"] * 1_000_000
+    cons["consumption_kg"] = cons["consumption_1000t"] * 1_000_000
     
     logger.info("Unindo dadasets")
     df = (
