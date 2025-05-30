@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path("data")
 FAO_CSV = DATA_DIR / "coffee_consumption_2023.csv"
 EM_WATER_CSV = DATA_DIR / "coffee_emission_water.csv"
-GHG_URL = "https://nyc3.digitaloceanspaces.com/owid-public/data/energy/ghg-per-kg-poore.csv"
-WATER_URL = "https://nyc3.digitaloceanspaces.com/owid-public/data/water/water-withdrawals-per-kg-poore.csv"
+GHG_URL = "https://ourworldindata.org/grapher/ghg-per-kg-poore.csv"
+WATER_URL = "https://ourworldindata.org/grapher/water-withdrawals-per-kg-poore.csv"
 POP_CSV = DATA_DIR / "population_2023.csv"
 WB_API = "http://api.worldbank.org/v2/country/all/indicator/SP.POP.TOTL"
 
@@ -66,34 +66,39 @@ def fetch_emission_water() -> Optional[pd.DataFrame]:
     headers = {"User-Agent": "python-requests"}
 
     try:
-        r1 = session.get(GHG_URL, headers=headers, timeout=10)
+        r1 = session.get(GHG_URL, headers=headers, timeout=20)
         r1.raise_for_status()
         ghg_df = pd.read_csv(StringIO(r1.text))
         coffee_ghg = (
             ghg_df.query("Entity == 'Coffee'")
-            .loc[:, ['Entity', 'GHG emissions per kilogram (Poore & Nemecek, 2018)']]
+            .loc[:, ['Entity', 'Year', "GHG emissions per kilogram (Poore & Nemecek, 2018)"]]
             .rename(columns={
                 "Entity": "product",
+                "Year": "year",
                 "GHG emissions per kilogram (Poore & Nemecek, 2018)": "emission_kgCO2e_per_kg"
             })
         )
         
-        r2 = session.get(WATER_URL, headers=headers, timeout=10)
+        r2 = session.get(WATER_URL, headers=headers, timeout=20)
         r2.raise_for_status()
         water_df = pd.read_csv(StringIO(r2.text))
         coffee_water = (
             water_df.query("Entity == 'Coffee'")
-            .loc[:,["Entity", "Freshwater withdrawals per kilogram (Poore & Nemecek, 2018)"]]
+            .loc[:,["Entity", "Year", "Freshwater withdrawals per kilogram (Poore & Nemecek, 2018)"]]
             .rename(columns={
                 "Entity": "product",
+                "Year": "year",
                 "Freshwater withdrawals per kilogram (Poore & Nemecek, 2018)": "water_l_perg_kg"
             })
         )
         
-        df = pd.merge(coffee_ghg, coffee_water, on='product')
+        df = pd.merge(coffee_ghg, coffee_water, on=['product', 'year'], how="inner")
+        latest_year = df['year'].max()
+        df = df.query("year == @latest_year").reset_index(drop=True)
+        df = df[["product", "emission_kgCO2e_per_kg", "water_l_perg_kg"]]
         EM_WATER_CSV.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(EM_WATER_CSV, index=False)
-        logger.info(f"Dados de emissão/água salvos em {EM_WATER_CSV}, vindos de Our World in Data")
+        logger.info(f"Dados de emissão/água salvos em {EM_WATER_CSV} (ano {latest_year}), vindos de Our World in Data")
         return df
     
     except Exception as e:
