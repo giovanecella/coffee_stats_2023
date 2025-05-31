@@ -9,7 +9,7 @@ import pandas as pd
 from io import StringIO
 from faostat import get_data_df
 
-
+#alterar para pegar iso country code com tabela fao p/ juncao
 
 logging.basicConfig(
     level=logging.INFO,
@@ -88,14 +88,14 @@ def fetch_emission_water() -> Optional[pd.DataFrame]:
             .rename(columns={
                 "Entity": "product",
                 "Year": "year",
-                "Freshwater withdrawals per kilogram (Poore & Nemecek, 2018)": "water_l_perg_kg"
+                "Freshwater withdrawals per kilogram (Poore & Nemecek, 2018)": "water_l_per_kg"
             })
         )
         
         df = pd.merge(coffee_ghg, coffee_water, on=['product', 'year'], how="inner")
         latest_year = df['year'].max()
         df = df.query("year == @latest_year").reset_index(drop=True)
-        df = df[["product", "emission_kgCO2e_per_kg", "water_l_perg_kg"]]
+        df = df[["product", "emission_kgCO2e_per_kg", "water_l_per_kg"]]
         EM_WATER_CSV.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(EM_WATER_CSV, index=False)
         logger.info(f"Dados de emissão/água salvos em {EM_WATER_CSV} (ano {latest_year}), vindos de Our World in Data")
