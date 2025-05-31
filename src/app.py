@@ -17,9 +17,9 @@ EMISSION_SOURCE_COLORS = {
     "farm": "#8bc34a",
     "processing": "#ffc107",
     "transport": "#ff9800",
-    "retail": "9c27b0",
+    "retail": "#9c27b0",
     "packaging": "#3f51b5",
-    "losses": "f44336"
+    "losses": "#f44336"
 }
 
 
@@ -35,14 +35,17 @@ def load_data():
         return pd.DataFrame()
 
 @st.cache_data
-def translate_country_names(country_name: pd.Series) -> pd.Series:
+def translate_country_names(country_names: pd.Series) -> pd.Series:
+    if country_names is None or country_names.empty:
+        return pd.Series(dtype=str)
+    
     translations = {}
     for name in country_names.unique():
         try:
             translated = translator.translate(name, src='en', dest='pt').text
             translations[name] = translated
         except Exception as e:
-            st.warning(f"Tradução falhou para {name}: {str(e)}")
+            #st.warning(f"Tradução falhou para {name}: {str(e)}")
             translations[name] = name
     return country_names.map(translations)
         
@@ -56,7 +59,7 @@ st.title("🌍 Sustentabilidade Global do Café")
 
 metric = st.radio(
     "Escolha uma métrica:",
-    options=("Consumo de café per capita", "Emissões totais do café", "Consumo de água per capita (do café)"),
+    options=("Consumo de café per capita", "Emissões totais por café", "Consumo de água per capita (do café)"),
     horizontal=True
 )
 
@@ -76,7 +79,7 @@ metric_map = {
     "Consumo de água per capita (do café)": {
         "column": "water_per_capita",
         "unit": "L/pessoa",
-        "colors": px.colors.squential.Blues,
+        "colors": px.colors.sequential.Blues,
         "format": "{:,.1f}"
     }
 }
@@ -87,18 +90,18 @@ col = metric_config["column"]
 if not df.empty:
     fig = px.choropleth(
         df,
-        locations="iso_alpha",
+        locations="country_code",
         color=col,
         hover_name="country_pt",
         hover_data={
             "consumption_kg_per_capita": ":.2f",
             "total_emission_million_kgCO2e": ":.2f",
             "water_per_capita": ":,.1f",
-            "iso_alpha": False,
+            "country_code": False,
             "country_pt": False
         },
         color_continuous_scale=metric_config["colors"],
-        title=f"{metric} ({metri_config['unit']})",
+        title=f"{metric} ({metric_config['unit']})",
         labels={col: f"{metric} ({metric_config['unit']})"},
         projection="natural earth"
     )
@@ -170,6 +173,8 @@ if selected_country:
             values="share",
             color="source",
             color_discrete_map=EMISSION_SOURCE_COLORS,
+            hover_data= None,
+            hover_name= None,
             hole=0.4,
             title="Emissões por estágio da cadeia de produção"
         )   
@@ -182,8 +187,10 @@ if selected_country:
             y="Emissões (kg CO₂e)",
             color="source",
             color_discrete_map=EMISSION_SOURCE_COLORS,
+            hover_data= None,
+            hover_name= None,
             title="Emissões absolutas por estágio",
-            labels={"name": "Estágio de produção"
+            labels={"name": "Estágio de produção"}
         )
         st.plotly_chart(fig_bar, use_container_width=True)
     
@@ -210,7 +217,7 @@ if selected_country:
     with col2:
         st.metric(
             "Média global de emissões",
-            f"{avg_emission/1_000_000:.2f} milhões de kg CO₂e",
+            f"{avg_emission/1_000_000:.2f} milhões de kg CO₂e",
             f"{emission_diff:+1f}%",
             delta_color="inverse"
         )
