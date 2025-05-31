@@ -2,7 +2,7 @@ import pandas as pd
 import pycountry
 import logging
 from pathlib import Path
-
+#alterar para fazer juncao dos datasets a partir do iso code. se nao houver, dropar
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -40,32 +40,31 @@ def transform_all() -> pd.DataFrame:
         logger.error(f"Arquivo de dados não encontrado {str(e)}")
         raise
     
-    required_columns = {
-        cons: ["country", "consumption_1000t"],
-        emis: ["emission_kgCO2e_per_kg", "water_l_per_kg"],
-        pop: ["country", "population", "year"]
-    }
+    required_columns = [
+        (cons, ["Area", "consumption_t"]),
+        (emis, ["product", "emission_kgCO2e_per_kg", "water_l_per_kg"]),
+        (pop, ["country", "country_code", "population"])
+    ]
     
-    for df, cols in required_columns.items():
-        missing = [c for c in cols if c not in df.columns]
+    for df_obj, cols in required_columns:
+        missing = [c for c in cols if c not in df_obj.columns]
         if missing:
             logger.error(f"Faltam colunas no dataset: {', '.join(missing)}")
             raise ValueError("Estrutura de dados inválida")
     
     logger.info("Normalizando nomes de países")
-    cons["country_norm"] = cons["country"].apply(normalize_country)
+    cons["country_norm"] = cons["Area"].apply(normalize_country)
     pop["country_norm"] = pop["country"].apply(normalize_country)
     
     emis["country_norm"] = "Global"
     
-    pop_2023 = pop.query("year == 2023").copy()
-    cons["consumption_kg"] = cons["consumption_1000t"] * 1_000_000
+    cons["consumption_kg"] = cons["consumption_t"] * 1000
     
     logger.info("Unindo dadasets")
     df = (
         cons[["country_norm", "consumption_kg"]]
         .merge(
-            pop_2023[["country_norm", "population"]],
+            pop[["country_norm", "country_code", "population"]],
             on="country_norm",
             how="left"
         )
@@ -82,7 +81,7 @@ def transform_all() -> pd.DataFrame:
     df["total_water_l"] = df["consumption_kg"] * df["water_l_per_kg"]
     df["water_per_capita"] = df["consumption_kg_per_capita"] * df["water_l_per_kg"]
     
-    country_map = cons.set_index("country_norm")["country"].to_dict()
+    country_map = cons.set_index("country_norm")["Area"].to_dict()
     df["original_country"] = df["country_norm"].map(country_map)
     
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
